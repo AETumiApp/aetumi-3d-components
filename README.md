@@ -2,48 +2,85 @@
 
 Reusable **3D web components, hero sections, product interactions and animated elements** for modern Three.js, WebGL, React and Next.js projects.
 
-AETumi is an AI-native 3D web platform for production-ready websites, components, scenes, prompts and AI coding workflows.
+**AETumi is an AI-native 3D web platform for production-ready Three.js and WebGL websites, Next.js and React components, 3D scenes, AI prompts, and MCP workflows for AI coding assistants.**
+
+## Why componentization matters
+
+A 3D effect becomes much more useful when it has a clear API, predictable lifecycle and a page-level purpose. This repository focuses on turning visual experiments into components that can move between projects without dragging an entire demo site behind them.
 
 ## Component categories
 
 - 3D hero sections
-- Product viewers
-- Interactive carousels
-- Particle systems
-- Animated WebGL backgrounds
-- Scroll-linked components
-- Product reveal sequences
-- Shader effects
-- Scene transitions
-- Interactive call-to-action sections
+- product viewers
+- interactive carousels
+- particle systems
+- animated WebGL backgrounds
+- scroll-linked components
+- product reveal sequences
+- shader effects
+- scene transitions
+- interactive CTA sections
 
-## Component design goals
+## Component contract
 
-- Reusable API surfaces
-- Responsive by default
-- Clear loading states
-- Reduced-motion fallbacks
-- Good resource cleanup
-- Easy integration into React and Next.js
-- Production-aware performance
-- Flexible styling without coupling scene logic to page layout
+A reusable component should clearly define:
+
+1. **Inputs** — content, visual options and interaction state.
+2. **Outputs** — callbacks and meaningful interaction events.
+3. **Lifecycle** — initialization, resize, pause and teardown.
+4. **Fallbacks** — reduced motion, mobile and non-WebGL states.
+5. **Performance envelope** — expected asset size and rendering cost.
+
+## Example API shape
+
+```text
+<ProductReveal
+  model="/product.glb"
+  progress={scrollProgress}
+  reducedMotionFallback="poster"
+  onReady={...}
+  onInteraction={...}
+/>
+```
+
+The public API should stay simple even when the rendering internals are not.
+
+## Production checklist
+
+- component owns and cleans up its rendering resources
+- canvas sizing follows the component container
+- interaction does not block normal page controls
+- state updates do not trigger unnecessary React renders
+- heavy assets are lazy-loaded
+- reduced-motion behavior is explicit
+- touch interaction is designed rather than accidentally inherited
+- semantic content remains outside the canvas where appropriate
+- component can be measured with analytics events
 
 ## AETumi resources
 
-- 3D Components: https://aetumi.app/3d-components/
-- Three.js: https://aetumi.app/threejs/
-- WebGL: https://aetumi.app/webgl/
-- 3D Scroll: https://aetumi.app/3d-scroll/
-- Interactive Websites: https://aetumi.app/interactive-websites/
-- Docs: https://aetumi.app/docs/
+- [3D Components](https://aetumi.app/3d-components/)
+- [Three.js](https://aetumi.app/threejs/)
+- [WebGL](https://aetumi.app/webgl/)
+- [3D Scroll](https://aetumi.app/3d-scroll/)
+- [Interactive Websites](https://aetumi.app/interactive-websites/)
+- [Docs](https://aetumi.app/docs/)
 
 ## Related repositories
 
-- https://github.com/AETumiApp/webgl-react-components
-- https://github.com/AETumiApp/threejs-product-viewer
-- https://github.com/AETumiApp/react-three-fiber-examples
-- https://github.com/AETumiApp/webgl-shader-examples
+- [webgl-react-components](https://github.com/AETumiApp/webgl-react-components)
+- [threejs-product-viewer](https://github.com/AETumiApp/threejs-product-viewer)
+- [react-three-fiber-examples](https://github.com/AETumiApp/react-three-fiber-examples)
+- [webgl-shader-examples](https://github.com/AETumiApp/webgl-shader-examples)
+
+## Repository status
+
+Documentation-first. Planned examples will show one reusable interaction at a time, with a clear API and production checklist.
+
+See [examples/README.md](./examples/README.md).
 
 ## About AETumi
 
 AETumi helps designers, developers and agencies build reusable, cinematic 3D web experiences with Three.js, WebGL, Next.js, React, React Three Fiber and AI-assisted workflows.
+
+Main site: https://aetumi.app/
