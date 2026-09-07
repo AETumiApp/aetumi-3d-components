@@ -75,10 +75,9 @@ The public API should stay simple even when the rendering internals are not.
 
 ## Repository status
 
-Documentation-first. Planned examples will show one reusable interaction at a time, with a clear API and production checklist.
+Active. Runnable, production-oriented examples now live in [`examples/`](./examples/) — reviewed for performance (adaptive quality), accessibility, reduced-motion and non-WebGL fallbacks, and clean resource disposal. The set is refined and extended as new patterns land.
 
 See [examples/README.md](./examples/README.md).
-
 ## About AETumi
 
 AETumi helps designers, developers and agencies build reusable, cinematic 3D web experiences with Three.js, WebGL, Next.js, React, React Three Fiber and AI-assisted workflows.
