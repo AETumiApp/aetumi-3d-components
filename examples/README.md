@@ -1,61 +1,19 @@
 # aetumi-3d-components — Examples
 
-Reusable Three.js (r160) UI components. No build step: open any `.html` file in a modern browser and it runs.
+Reusable, **production-grade** Three.js (r160) UI components. No build step: open any `.html` file in a modern browser and it runs.
 
 | Example | Description |
 | --- | --- |
-| [`product-showcase.html`](./product-showcase.html) | A "product showcase" component — a floating rounded platform with a product on a rotating turntable, studio lighting via `RoomEnvironment`, and three material-variant buttons that hot-swap color / roughness / metalness. |
+| [`product-showcase.html`](./product-showcase.html) | A "product showcase" component — a floating platform with a product on a rotating turntable, studio lighting via `RoomEnvironment` + ACES tone mapping, and three material-variant buttons that hot-swap color / roughness / metalness. |
 
-The example loads Three.js as ES modules through an importmap (`three` from cdnjs, addons from jsdelivr). It respects `prefers-reduced-motion` and handles resize.
+### Expert / production features (every example)
+
+- **Capability detection + graceful fallback** — probes WebGL2 → WebGL → none. With no WebGL context (or `prefers-reduced-motion`) it paints a tasteful CSS gradient poster instead of a blank canvas; low-power devices start at reduced quality and mesh detail.
+- **Adaptive performance** — DPR capped at 2; a rolling FPS average steps DPR down below 50 fps and back up above 58 fps with hysteresis. The loop pauses when the component scrolls offscreen (`IntersectionObserver`) or the tab is hidden.
+- **Strict cleanup** — one `dispose()` releases the PMREM render target, all geometries/materials, the environment map, listeners and the renderer, on `pagehide`.
+- **Accessibility** — the canvas is `role="img"` with an `aria-label`; the variant buttons are native `<button>`s (keyboard-reachable) with `aria-pressed` and visible focus rings; motion respects `prefers-reduced-motion`.
+- **Premium look** — image-based studio lighting (`RoomEnvironment`) through a PMREM environment map, ACES Filmic tone mapping, and an emissive accent ring.
+
+Three.js r160 is loaded as ES modules through an importmap on **jsDelivr only** (`three` + `three/addons/`).
 
 Explore more on the hub: **https://aetumi.app** · component gallery → https://aetumi.app/morae
-
----
-
-## Example backlog / roadmap
-
-# AETumi 3D Component Example Backlog
-
-## Planned examples
-
-### Product reveal
-
-Reusable component driven by an external `progress` value with a static fallback.
-
-### Shader hero
-
-Container-sized WebGL hero with explicit props, loading state and reduced-motion behavior.
-
-### Particle background
-
-Decorative particle field that pauses off-screen and never captures pointer input unless enabled.
-
-### Interactive carousel
-
-HTML-first carousel with optional 3D depth, keyboard controls and touch behavior.
-
-### Scroll-linked section
-
-A component that accepts normalized scroll progress instead of owning global scroll listeners.
-
-### Hotspot viewer
-
-3D positions mapped to accessible HTML labels and click targets.
-
-## Component acceptance criteria
-
-Each example should define:
-
-- public props
-- lifecycle ownership
-- cleanup
-- responsive behavior
-- accessibility fallback
-- performance notes
-- meaningful interaction callbacks
-
-## AETumi links
-
-- https://aetumi.app/3d-components/
-- https://aetumi.app/threejs/
-- https://aetumi.app/webgl/
