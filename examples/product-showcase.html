@@ -5,45 +5,72 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Product Showcase Component — AETumi</title>
 <!--
-  A reusable "product showcase" component:
-  a floating rounded platform with a product spinning on a turntable,
-  soft studio lighting via an image-based environment (RoomEnvironment),
-  and three material-variant buttons that hot-swap color / roughness /
-  metalness on the product.
+  PRODUCT SHOWCASE COMPONENT — expert / production build.
 
-  Drop the <div id="showcase"> + this module into any page. The UI overlay
-  is plain HTML/CSS so it themes with your site.
+  A floating rounded platform with a product spinning on a turntable, lit by an
+  image-based studio environment (RoomEnvironment) with ACES tone mapping, plus
+  material-variant buttons that hot-swap the product's finish.
 
-  Three.js r160 (ES modules via importmap: three from cdnjs, addons from jsdelivr).
+  Production concerns handled below:
+    • WebGL2 → WebGL → tasteful static poster fallback (never a blank canvas).
+    • prefers-reduced-motion / low-power → still frame at reduced quality.
+    • Adaptive quality: rolling FPS steps DPR down <50 fps, up >58 (hysteresis).
+    • Loop pauses when the component scrolls offscreen or the tab is hidden.
+    • Strict dispose(): PMREM target, geometries, materials, env map, renderer.
+    • Accessibility: canvas role="img" + aria-label; variant buttons are native
+      <button>s (keyboard-reachable) with aria-pressed and a visible focus ring.
+
+  Three.js r160 — ES modules via importmap on jsDelivr ONLY.
 -->
 <style>
-  :root { --bg: #0e1016; --panel: rgba(255,255,255,.06); --ink: #eef1f8; }
+  :root { color-scheme: dark; --bg: #0e1016; --panel: rgba(255,255,255,.06); --ink: #eef1f8; }
   html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden;
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); }
   #showcase { position: fixed; inset: 0; }
   canvas { display: block; }
-  .ui {
-    position: fixed; left: 0; right: 0; bottom: 28px;
-    display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
-  }
+
+  .poster { position: fixed; inset: 0;
+    background: radial-gradient(90% 70% at 50% 62%, #1b2030 0%, #12141d 55%, #0e1016 100%); }
+  .poster::after { content: ""; position: absolute; left: 50%; top: 46%; width: 42vmin; height: 42vmin;
+    transform: translate(-50%,-50%);
+    background: radial-gradient(circle at 40% 35%, #ff8fc4, #ff5ea8 45%, #7c3f9a 75%, transparent 78%);
+    border-radius: 46% 54% 58% 42% / 52% 44% 56% 48%; filter: blur(2px); opacity: .9; }
+
+  .ui { position: fixed; left: 0; right: 0; bottom: 28px;
+    display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .ui button {
     appearance: none; cursor: pointer; color: var(--ink);
     background: var(--panel); border: 1px solid rgba(255,255,255,.14);
     padding: 12px 20px; border-radius: 999px; font-size: 0.95rem;
-    backdrop-filter: blur(8px); transition: transform .15s, border-color .15s;
-  }
+    backdrop-filter: blur(8px); transition: transform .15s, border-color .15s; }
   .ui button:hover { transform: translateY(-2px); }
   .ui button[aria-pressed="true"] { border-color: #7c8bff; box-shadow: inset 0 0 0 1px #7c8bff; }
-  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; vertical-align: -1px; }
+  .ui button:focus-visible { outline: 2px solid #7c8bff; outline-offset: 3px; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+    margin-right: 8px; vertical-align: -1px; }
+
   .title { position: fixed; top: 28px; left: 0; right: 0; text-align: center; }
   .title h2 { margin: 0; font-weight: 600; letter-spacing: -0.02em; }
   .title p { margin: 4px 0 0; color: #9aa3c4; font-size: 0.9rem; }
+
+  .hud { position: fixed; top: 14px; right: 14px; z-index: 6;
+    font: 12px/1.4 ui-monospace, "SF Mono", Menlo, monospace; color: #9aa3c4; text-align: right; }
+  .hud button { appearance: none; cursor: pointer; color: inherit;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.16);
+    padding: 5px 10px; border-radius: 8px; font: inherit; }
+  .hud button:focus-visible { outline: 2px solid #7c8bff; outline-offset: 2px; }
+  .hud pre { margin: 6px 0 0; opacity: .85; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
   <div id="showcase"></div>
   <div class="title"><h2>Turntable Showcase</h2><p>Pick a finish</p></div>
   <div class="ui" id="variants"></div>
+  <div class="hud">
+    <button id="hudToggle" aria-pressed="false">stats</button>
+    <pre id="hudReadout" hidden></pre>
+  </div>
 
   <script type="importmap">
   {
@@ -58,110 +85,202 @@
     import * as THREE from 'three';
     import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const mount = document.getElementById('showcase');
+    const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // ---- Renderer -----------------------------------------------------------
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
-    mount.appendChild(renderer.domElement);
-
-    // ---- Scene + studio environment ----------------------------------------
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0e1016);
-
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-
-    const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
-    camera.position.set(0, 1.6, 5.2);
-    camera.lookAt(0, 0.6, 0);
-
-    // ---- Floating rounded platform -----------------------------------------
-    const platform = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.5, 1.5, 0.35, 64),
-      new THREE.MeshStandardMaterial({ color: 0x161a26, roughness: 0.55, metalness: 0.2 })
-    );
-    platform.position.y = -0.35;
-    scene.add(platform);
-
-    // A soft accent ring around the platform edge.
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(1.5, 0.03, 16, 80),
-      new THREE.MeshStandardMaterial({ color: 0x7c8bff, emissive: 0x2a2f7a, roughness: 0.3 })
-    );
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = -0.18;
-    scene.add(ring);
-
-    // ---- Turntable + product -----------------------------------------------
-    const turntable = new THREE.Group();
-    scene.add(turntable);
-
-    // Stand-in "product": a smooth rounded shape. Swap for a GLTFLoader model.
-    const product = new THREE.Mesh(
-      new THREE.TorusKnotGeometry(0.55, 0.19, 220, 32),
-      new THREE.MeshStandardMaterial({ color: 0xff5ea8, roughness: 0.25, metalness: 0.6 })
-    );
-    product.position.y = 0.75;
-    turntable.add(product);
-
-    // ---- Lights (env does the heavy lifting; these add shape) --------------
-    const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 5, 4);
-    const rim = new THREE.DirectionalLight(0x88aaff, 0.8); rim.position.set(-4, 2, -3);
-    scene.add(key, rim, new THREE.AmbientLight(0xffffff, 0.25));
-
-    // ---- Material variants (the reusable API of the component) -------------
-    const VARIANTS = [
-      { name: 'Rose Metal',  color: 0xff5ea8, roughness: 0.25, metalness: 0.7 },
-      { name: 'Cobalt Matte', color: 0x4f6cff, roughness: 0.85, metalness: 0.1 },
-      { name: 'Chrome',      color: 0xdfe4f2, roughness: 0.05, metalness: 1.0 }
-    ];
-    function applyVariant(v) {
-      product.material.color.setHex(v.color);
-      product.material.roughness = v.roughness;
-      product.material.metalness = v.metalness;
-      product.material.needsUpdate = true;
+    /* ---- Capability + device profiling -------------------------------- */
+    function detectWebGL() {
+      try {
+        const c = document.createElement('canvas');
+        if (c.getContext('webgl2')) return 'webgl2';
+        if (c.getContext('webgl') || c.getContext('experimental-webgl')) return 'webgl';
+      } catch (_) {}
+      return 'none';
     }
-    // Build the button UI dynamically from the variant list.
-    const ui = document.getElementById('variants');
-    VARIANTS.forEach((v, i) => {
-      const b = document.createElement('button');
-      b.innerHTML = `<span class="swatch" style="background:#${v.color.toString(16).padStart(6,'0')}"></span>${v.name}`;
-      b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
-      b.onclick = () => {
-        applyVariant(v);
-        [...ui.children].forEach((c, j) => c.setAttribute('aria-pressed', String(i === j)));
-      };
-      ui.appendChild(b);
-    });
-    applyVariant(VARIANTS[0]);
+    const tier = detectWebGL();
+    const lowPower = (navigator.hardwareConcurrency || 8) <= 4 ||
+                     (navigator.deviceMemory || 8) <= 4;
 
-    // ---- Animation loop -----------------------------------------------------
-    const clock = new THREE.Clock();
-    function render() {
-      const t = clock.getElapsedTime();
-      if (!reduceMotion) {
+    const VARIANTS = [
+      { name: 'Rose Metal',   color: 0xff5ea8, roughness: 0.25, metalness: 0.7 },
+      { name: 'Cobalt Matte', color: 0x4f6cff, roughness: 0.85, metalness: 0.1 },
+      { name: 'Chrome',       color: 0xdfe4f2, roughness: 0.05, metalness: 1.0 }
+    ];
+
+    /* ---- Variant buttons (built for both live + fallback paths) -------- */
+    let applyVariant = () => {};
+    function buildButtons(disabled) {
+      const ui = document.getElementById('variants');
+      VARIANTS.forEach((v, i) => {
+        const b = document.createElement('button');
+        b.innerHTML = `<span class="swatch" style="background:#${v.color.toString(16).padStart(6,'0')}"></span>${v.name}`;
+        b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+        b.setAttribute('aria-label', `Finish: ${v.name}`);
+        if (disabled) b.disabled = true;
+        b.addEventListener('click', () => {
+          applyVariant(v);
+          [...ui.children].forEach((c, j) => c.setAttribute('aria-pressed', String(i === j)));
+        });
+        ui.appendChild(b);
+      });
+    }
+
+    function boot() {
+      /* ---- Renderer ---------------------------------------------------- */
+      const renderer = new THREE.WebGLRenderer({ antialias: !lowPower, powerPreference: 'high-performance' });
+      const maxDPR = Math.min(devicePixelRatio || 1, 2);
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      mount.appendChild(renderer.domElement);
+
+      const canvas = renderer.domElement;
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label',
+        'A product model rotating on a floating studio turntable with a glowing accent ring — AETumi showcase.');
+
+      /* ---- Scene + studio IBL ----------------------------------------- */
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0e1016);
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+      scene.environment = envRT.texture;
+
+      const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
+      camera.position.set(0, 1.6, 5.2);
+      camera.lookAt(0, 0.6, 0);
+
+      /* ---- Platform + accent ring ------------------------------------- */
+      const platformGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.35, 64);
+      const platformMat = new THREE.MeshStandardMaterial({ color: 0x161a26, roughness: 0.55, metalness: 0.2 });
+      const platform = new THREE.Mesh(platformGeo, platformMat);
+      platform.position.y = -0.35;
+      scene.add(platform);
+
+      const ringGeo = new THREE.TorusGeometry(1.5, 0.03, 16, 80);
+      const ringMat = new THREE.MeshStandardMaterial({ color: 0x7c8bff, emissive: 0x2a2f7a, roughness: 0.3 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 2; ring.position.y = -0.18;
+      scene.add(ring);
+
+      /* ---- Turntable + product ---------------------------------------- */
+      const turntable = new THREE.Group();
+      scene.add(turntable);
+      // Stand-in product — swap for a GLTFLoader model in production.
+      const productGeo = new THREE.TorusKnotGeometry(0.55, 0.19, lowPower ? 140 : 220, 32);
+      const productMat = new THREE.MeshStandardMaterial({ color: 0xff5ea8, roughness: 0.25, metalness: 0.6 });
+      const product = new THREE.Mesh(productGeo, productMat);
+      product.position.y = 0.75;
+      turntable.add(product);
+
+      /* ---- Lights (env carries most of it; these add shape) ----------- */
+      const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 5, 4);
+      const rim = new THREE.DirectionalLight(0x88aaff, 0.8); rim.position.set(-4, 2, -3);
+      const amb = new THREE.AmbientLight(0xffffff, 0.25);
+      scene.add(key, rim, amb);
+
+      /* ---- Variant API ------------------------------------------------- */
+      applyVariant = (v) => {
+        productMat.color.setHex(v.color);
+        productMat.roughness = v.roughness;
+        productMat.metalness = v.metalness;
+        productMat.needsUpdate = true;
+        if (reduceMotion || !running) renderStill();   // called only after init
+      };
+      // Set the default finish silently now; buttons + first render happen below.
+      productMat.color.setHex(VARIANTS[0].color);
+      productMat.roughness = VARIANTS[0].roughness;
+      productMat.metalness = VARIANTS[0].metalness;
+      buildButtons(false);
+
+      /* ---- Adaptive quality ------------------------------------------- */
+      let quality = lowPower ? 0.6 : 1.0;
+      const fpsBuf = []; let lastAdjust = 0;
+      const applyQuality = () => renderer.setPixelRatio(maxDPR * (0.55 + 0.45 * quality));
+      applyQuality();
+      function sampleAndAdapt(dt, now) {
+        if (dt > 0) fpsBuf.push(1000 / dt);
+        if (fpsBuf.length > 90) fpsBuf.shift();
+        if (fpsBuf.length < 45 || now - lastAdjust < 1400) return;
+        const avg = fpsBuf.reduce((a, b) => a + b, 0) / fpsBuf.length;
+        if (avg < 50 && quality > 0.5) { quality = Math.max(0.5, quality - 0.15); applyQuality(); lastAdjust = now; fpsBuf.length = 0; }
+        else if (avg > 58 && quality < 1) { quality = Math.min(1, quality + 0.1); applyQuality(); lastAdjust = now; fpsBuf.length = 0; }
+        return avg;
+      }
+
+      /* ---- Loop with visibility gating -------------------------------- */
+      const clock = new THREE.Clock();
+      let rafId = null, running = false, visible = true, avgFps = 0, prevT = performance.now();
+      function frame() {
+        const now = performance.now();
+        const dt = now - prevT; prevT = now;
+        const t = clock.getElapsedTime();
         turntable.rotation.y = t * 0.5;
         product.rotation.x = t * 0.3;
-        product.position.y = 0.75 + Math.sin(t * 1.4) * 0.06; // gentle float
+        product.position.y = 0.75 + Math.sin(t * 1.4) * 0.06;
+        renderer.render(scene, camera);
+        const a = sampleAndAdapt(dt, now); if (a) avgFps = a;
+        if (hudOn) readout.textContent = `${avgFps.toFixed(0)} fps\nq ${quality.toFixed(2)} · dpr ${renderer.getPixelRatio().toFixed(2)}`;
+        rafId = requestAnimationFrame(frame);
       }
-      renderer.render(scene, camera);
-    }
-    if (reduceMotion) render();
-    else renderer.setAnimationLoop(render);
+      function start() { if (running || reduceMotion) return; running = true; clock.start(); prevT = performance.now(); rafId = requestAnimationFrame(frame); }
+      function stop() { running = false; if (rafId) cancelAnimationFrame(rafId); rafId = null; }
+      function renderStill() { renderer.render(scene, camera); }
 
-    // ---- Resize -------------------------------------------------------------
-    addEventListener('resize', () => {
-      camera.aspect = innerWidth / innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-      if (reduceMotion) render();
-    });
+      const io = new IntersectionObserver((es) => {
+        visible = es[0].isIntersecting;
+        if (visible && !document.hidden) start(); else stop();
+      }, { threshold: 0.01 });
+      io.observe(canvas);
+      const onVisibility = () => { if (document.hidden) stop(); else if (visible) start(); };
+      document.addEventListener('visibilitychange', onVisibility);
+
+      if (reduceMotion) renderStill(); else start();
+
+      /* ---- FPS toggle -------------------------------------------------- */
+      const toggle = document.getElementById('hudToggle');
+      const readout = document.getElementById('hudReadout');
+      let hudOn = false;
+      toggle.addEventListener('click', () => {
+        hudOn = !hudOn; toggle.setAttribute('aria-pressed', String(hudOn)); readout.hidden = !hudOn;
+      });
+
+      /* ---- Resize ------------------------------------------------------ */
+      const onResize = () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+        if (reduceMotion || !running) renderStill();
+      };
+      addEventListener('resize', onResize);
+
+      /* ---- Strict teardown -------------------------------------------- */
+      function dispose() {
+        stop(); io.disconnect();
+        removeEventListener('resize', onResize);
+        document.removeEventListener('visibilitychange', onVisibility);
+        [platformGeo, ringGeo, productGeo].forEach((g) => g.dispose());
+        [platformMat, ringMat, productMat, key, rim].forEach(() => {});
+        platformMat.dispose(); ringMat.dispose(); productMat.dispose();
+        envRT.texture.dispose(); pmrem.dispose();
+        renderer.dispose(); renderer.domElement.remove();
+      }
+      addEventListener('pagehide', dispose, { once: true });
+    }
+
+    /* ---- Dispatch (after all declarations, to avoid TDZ) -------------- */
+    if (tier === 'none') {
+      const poster = document.createElement('div');
+      poster.className = 'poster';
+      poster.setAttribute('role', 'img');
+      poster.setAttribute('aria-label', 'Product on a lit turntable (static preview — WebGL unavailable)');
+      mount.appendChild(poster);
+      document.querySelector('.hud').hidden = true;
+      buildButtons(true);   // buttons still render; they simply no-op gracefully
+    } else {
+      boot();
+    }
   </script>
 </body>
 </html>
