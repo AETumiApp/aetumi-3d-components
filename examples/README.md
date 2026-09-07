@@ -1,3 +1,19 @@
+# aetumi-3d-components — Examples
+
+Reusable Three.js (r160) UI components. No build step: open any `.html` file in a modern browser and it runs.
+
+| Example | Description |
+| --- | --- |
+| [`product-showcase.html`](./product-showcase.html) | A "product showcase" component — a floating rounded platform with a product on a rotating turntable, studio lighting via `RoomEnvironment`, and three material-variant buttons that hot-swap color / roughness / metalness. |
+
+The example loads Three.js as ES modules through an importmap (`three` from cdnjs, addons from jsdelivr). It respects `prefers-reduced-motion` and handles resize.
+
+Explore more on the hub: **https://aetumi.app** · component gallery → https://aetumi.app/morae
+
+---
+
+## Example backlog / roadmap
+
 # AETumi 3D Component Example Backlog
 
 ## Planned examples
