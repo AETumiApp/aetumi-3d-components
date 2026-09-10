@@ -83,3 +83,13 @@ See [examples/README.md](./examples/README.md).
 AETumi helps designers, developers and agencies build reusable, cinematic 3D web experiences with Three.js, WebGL, Next.js, React, React Three Fiber and AI-assisted workflows.
 
 Main site: https://aetumi.app/
+
+## Explore the AETumi library
+
+Production-ready 3D web you can own the source of — from [AETumi](https://aetumi.app), the AI-native 3D web platform:
+
+- [3D web components (Three.js & WebGL)](https://aetumi.app/3d-components/)
+- [Three.js website templates & 3D components](https://aetumi.app/threejs/)
+- [React Three Fiber components & examples](https://aetumi.app/react-three-fiber/)
+
+Build 3D web directly from your AI assistant with the [AETumi MCP for AI coding](https://aetumi.app/mcp/) — `claude mcp add --transport http aetumi https://mcp.aetumi.app`
