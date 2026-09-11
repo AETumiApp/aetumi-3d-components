@@ -4,6 +4,18 @@ Reusable **3D web components, hero sections, product interactions and animated e
 
 **AETumi is an AI-native 3D web platform for production-ready Three.js and WebGL websites, Next.js and React components, 3D scenes, AI prompts, and MCP workflows for AI coding assistants.**
 
+## What this helps teams build
+
+Ship cinematic 3D sections — hero moments, product reveals, interactive backgrounds — as reusable pieces, instead of rebuilding the rendering plumbing for every page.
+
+**Customer outcome.** A design-led site launches from a component with a defined API and lifecycle, so visual quality is repeatable and the page stays maintainable after launch.
+
+**Who it's for.** Designers who want creative control, developers who want a clean contract, and agencies reusing the same building blocks across client work.
+
+**What you customize.** Content, visual options and interaction state through each component's inputs — model, imagery, copy, timing and reduced-motion fallback — while the rendering internals stay encapsulated (see the component contract below).
+
+**AI-assisted adaptation.** Claude Code, Cursor and Codex can adapt a component to a brief when given its API and constraints as context, via the [AETumi MCP](https://aetumi.app/mcp/).
+
 ## Why componentization matters
 
 A 3D effect becomes much more useful when it has a clear API, predictable lifecycle and a page-level purpose. This repository focuses on turning visual experiments into components that can move between projects without dragging an entire demo site behind them.
